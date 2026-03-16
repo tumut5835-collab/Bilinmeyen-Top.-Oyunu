@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bilinmeyen Top Oyunu</title>
+<style>
+body{margin:0;background:#111;color:white;font-family:Arial;overflow:hidden;}
+#menu{position:fixed;width:100%;height:100%;background:#222;display:flex;flex-direction:column;align-items:center;justify-content:space-between;cursor:pointer;}
+#bNotice{margin-top:20px;font-size:22px;font-weight:bold;color:yellow;text-align:center;}
+#minigameNotice{margin-top:10px;font-size:18px;color:#0f0;text-align:center;}
+#menuCenter{display:flex;justify-content:space-between;width:90%;max-width:1200px;margin:auto;flex:1;align-items:center;}
+.menuItem{background:#333;padding:15px;border-radius:8px;max-width:220px;text-align:center;margin:5px;}
+.menuBall{font-size:40px;}
+#startText{margin-bottom:30px;font-size:20px;font-weight:bold;color:#fff;text-align:center;}
+#hud{position:fixed;top:10px;right:10px;text-align:right;font-size:18px;}
+.puan{position:absolute;font-size:28px;font-weight:bold;animation:puanYukari 1s forwards;}
+@keyframes puanYukari{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-80px)}}
+.ball{width:70px;height:70px;background:#3498db;border-radius:50%;position:absolute;display:flex;align-items:center;justify-content:center;font-size:30px;cursor:pointer;transition: transform 0.3s;}
+.missile{position:absolute;width:40px;height:120px;background:linear-gradient(gray,black);border-radius:20px;color:white;font-size:10px;display:flex;align-items:center;justify-content:center;text-align:center;transition:top 3s linear;}
+.explosion{position:absolute;width:80px;height:80px;background:red;border-radius:50%;animation:boom 1s forwards;}
+@keyframes boom{0%{transform:scale(1)}100%{transform:scale(14);opacity:0}}
+.slipper{position:absolute;width:40px;height:20px;background:brown;border-radius:10px;animation:slipFall 3s linear;}
+@keyframes slipFall{0%{top:-100px}100%{top:50%}}
+.powerBtn{position:fixed;bottom:20px;padding:15px;border:none;border-radius:10px;font-size:18px;z-index:100;}
+#rocketBtn{right:20px;background:red;color:white;}
+#slipperBtn{right:140px;background:orange;}
+#bText{position:fixed;top:50px;left:50%;transform:translateX(-50%);font-size:22px;color:yellow;font-weight:bold;display:none;}
+
+/* Minigame */
+#minigame{position:fixed;width:100%;height:100%;background:#00f;display:none;flex-direction:column;align-items:center;justify-content:flex-start;color:white;}
+#minigame h2{text-align:center;margin-top:20px;}
+#minigameGrid{display:grid;grid-template-columns:repeat(5,60px);grid-template-rows:repeat(4,60px);gap:10px;margin-top:auto;margin-bottom:50px;}
+.miniBox{background:#fff;color:#000;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:bold;cursor:pointer;border-radius:6px;transition: background 0.3s;}
+
+/* Liderlik Tablosu */
+#leaderboard{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+background:#222;color:white;padding:20px;border-radius:10px;max-width:400px;width:80%;text-align:center;z-index:1000;}
+#leaderboard ol{padding-left:20px;}
+#leaderboard button{margin-top:10px;padding:10px;border:none;border-radius:5px;background:#333;color:white;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <div id="bNotice">B tuşuna bas önemli</div>
+  <div id="minigameNotice">M tuşuna bas bir minigame açar</div>
+  <div id="menuCenter">
+    <div id="unknown" class="menuItem">
+      <div class="menuBall">?</div>
+      <p>Bilinmeyen Top<br>1‑10 puan gelebilir<br>3 puan gidebilir<br>10 puan gidebilir<br>+5 saniye gelebilir</p>
+    </div>
+    <div id="rocketInfo" class="menuItem">
+      🚀 İran’ın Balistik Füzesi "10'lu"<br>İ tuşuna bas ne olacağını anla
+    </div>
+    <div id="slipperInfo" class="menuItem">
+      🩴 Anne Terliği Makinesi<br>A tuşuna bas ve anla
+    </div>
+  </div>
+  <button id="leaderboardBtn" class="menuItem">🏆 Liderlik Tablosu</button>
+  <div id="startText">Rastgele yere tıkla ve oyun başlasın</div>
+</div>
+
+<div id="hud">
+Skor: <span id="skor">20</span><br>
+Süre: <span id="sure">60</span><br>
+Terlik Hakkı: <span id="slipperCount">2</span><br>
+Füze Hakkı: <span id="rocketCount">2</span><br>
+Minigame Hakkı: <span id="minigameCount">10</span>
+</div>
+
+<div id="bText">Batu Hoca adamdır, as bayrakları as as</div>
+
+<button id="rocketBtn" class="powerBtn">🚀 Füze</button>
+<button id="slipperBtn" class="powerBtn">🩴 Terlik</button>
+
+<!-- Minigame -->
+<div id="minigame">
+  <h2>Aklımdan 1-20 arası sayı tuttum onu bul</h2>
+  <div id="minigameGrid"></div>
+</div>
+
+<!-- Liderlik Tablosu -->
+<div id="leaderboard">
+  <h2>Liderlik Tablosu</h2>
+  <ol id="leaderboardList"></ol>
+  <button onclick="closeLeaderboard()">Kapat</button>
+</div>
+
+<script>
+// OYUN DEĞİŞKENLERİ
+let skor=20,sure=60,slipperUse=2,rocketUse=2,bUsed=false,minigameUse=10;
+let skorY=document.getElementById("skor"),sureY=document.getElementById("sure"),
+    slipperY=document.getElementById("slipperCount"),rocketY=document.getElementById("rocketCount"),
+    minigameY=document.getElementById("minigameCount");
+let balls=[],turTiklandi=false,oyun=false,sureInterval=null;
+
+// HUZUR VERİCİ MÜZİK
+let audioCtx;
+function playCalmMusic(){
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.1;
+    gainNode.connect(audioCtx.destination);
+    let notes = [261,293,329,349,392,440,493];
+    let i=0;
+    function nextNote(){
+        let osc = audioCtx.createOscillator();
+        osc.type='sine';
+        osc.frequency.setValueAtTime(notes[i%notes.length],audioCtx.currentTime);
+        osc.connect(gainNode);
+        osc.start();
+        osc.stop(audioCtx.currentTime+0.8);
+        i++;
+        setTimeout(nextNote,1000);
+    }
+    nextNote();
+}
+
+// TOP OLUŞTUR
+for(let i=0;i<10;i++){
+    let b=document.createElement("div");
+    b.className="ball";
+    b.innerText="?";
+    document.body.appendChild(b);
+    balls.push(b);
+    b.addEventListener("touchstart",()=>b.click());
+}
+
+// TUR
+function yeniTur(){
+    turTiklandi=false;
+    balls.forEach(b=>{
+        let x=Math.random()*(window.innerWidth-80);
+        let y=Math.random()*(window.innerHeight-80);
+        b.style.left=x+"px"; b.style.top=y+"px";
+        b.style.transform=`rotate(${Math.random()*360}deg)`;
+    });
+}
+
+// PUAN YAZISI
+function puanYazi(x,y,text){
+    let p=document.createElement("div");
+    p.className="puan";
+    p.innerText=text;
+    p.style.left=x+"px"; p.style.top=y+"px";
+    document.body.appendChild(p);
+    setTimeout(()=>p.remove(),1000);
+}
+
+// SONUÇ
+function sonuc(x,y){
+    let r=Math.floor(Math.random()*13);
+    if(r<=9){let puan=r+1; skor+=puan; puanYazi(x,y,"+"+puan);}
+    else if(r==10){skor-=3; puanYazi(x,y,"-3");}
+    else if(r==11){skor-=10; puanYazi(x,y,"-10");}
+    else{sure+=5; puanYazi(x,y,"+5s");}
+    skorY.innerText=skor; sureY.innerText=sure;
+}
+
+// TOP TIKLAMA
+balls.forEach(b=>{
+    b.onclick=function(){
+        if(!oyun) return;
+        if(turTiklandi) return;
+        turTiklandi=true;
+        let x=parseInt(b.style.left),y=parseInt(b.style.top);
+        sonuc(x,y);
+    }
+})
+
+// OYUN ZAMANI
+function startGameTimer(){
+    if(sureInterval) clearInterval(sureInterval);
+    sureInterval = setInterval(()=>{
+        sure--; sureY.innerText=sure;
+        if(sure<=0 || skor<0) gameOver();
+    },1000);
+}
+function pauseGameTimer(){
+    if(sureInterval) clearInterval(sureInterval);
+}
+
+// BALİSTİK FÜZE
+function balistikFuze(){
+    if(rocketUse<=0) return;
+    rocketUse--; rocketY.innerText=rocketUse;
+    let puanlar=[1,2,3,4,5,6,7,8,9,10];
+    balls.forEach((b,i)=>{
+        let x=parseInt(b.style.left),y=parseInt(b.style.top);
+        let missile=document.createElement("div");
+        missile.className="missile"; missile.innerText="İRAN\nFÜZESİ"; missile.style.left=x+"px"; missile.style.top="-150px";
+        document.body.appendChild(missile);
+        setTimeout(()=>{ missile.style.top=y+"px"; },50);
+        setTimeout(()=>{
+            missile.remove();
+            let e=document.createElement("div");
+            e.className="explosion"; e.style.left=x+"px"; e.style.top=y+"px";
+            document.body.appendChild(e);
+            puanYazi(x,y,"+"+puanlar[i]);
+            skor+=puanlar[i]; skorY.innerText=skor;
+            setTimeout(()=>e.remove(),1000);
+        },3050);
+    })
+}
+
+// TERLİK GÜCÜ
+function terlikMakinesi(){
+    if(slipperUse<=0) return;
+    slipperUse--; slipperY.innerText=slipperUse;
+    setTimeout(()=>{
+        balls.forEach(b=>{
+            let x=parseInt(b.style.left),y=parseInt(b.style.top);
+            let s=document.createElement("div");
+            s.className="slipper"; s.style.left=x+"px"; s.style.top="-50px";
+            document.body.appendChild(s);
+            setTimeout(()=>{
+                s.remove(); puanYazi(x,y,"+5"); skor+=5; skorY.innerText=skor;
+            },3000);
+        })
+    },4000)
+}
+
+// B TUŞU VE MINIGAME
+document.addEventListener("keydown",e=>{
+    if((e.key==="b"||e.key==="B")&&!bUsed){
+        bUsed=true;
+        document.getElementById("bText").style.display="block";
+        skor+=10; skorY.innerText=skor;
+    }
+    if((e.key==="m"||e.key==="M") && minigameUse>0 && oyun){
+        minigameUse--; minigameY.innerText=minigameUse;
+        startMinigame();
+    }
+    if(e.key==="i"||e.key==="İ") balistikFuze()
+    if(e.key==="a"||e.key==="A") terlikMakinesi()
+})
+
+// TUŞLAR VE BUTONLAR
+document.getElementById("rocketBtn").onclick=balistikFuze;
+document.getElementById("slipperBtn").onclick=terlikMakinesi;
+
+// OYUN BAŞLAT
+document.getElementById("menu").onclick = function(e){
+    oyun=true;
+    this.style.display="none";
+    playCalmMusic();
+    yeniTur();
+    setInterval(yeniTur,2000);
+    startGameTimer();
+}
+
+// MINIGAME FONKSİYONLARI
+function startMinigame(){
+    const mg = document.getElementById("minigame");
+    const grid = document.getElementById("minigameGrid");
+    mg.style.display="flex";
+    grid.innerHTML="";
+    balls.forEach(b=>b.style.display="none");
+    pauseGameTimer();
+    const number = Math.floor(Math.random()*20)+1;
+    let attempts = 0;
+
+    // Mesaj kutucuğu
+    let resultBox = document.createElement("div");
+    resultBox.style.position = "fixed";
+    resultBox.style.top = "50%";
+    resultBox.style.left = "50%";
+    resultBox.style.transform = "translate(-50%, -50%)";
+    resultBox.style.padding = "20px 30px";
+    resultBox.style.background = "#0f0";
+    resultBox.style.color = "#000";
+    resultBox.style.fontSize = "24px";
+    resultBox.style.fontWeight = "bold";
+    resultBox.style.borderRadius = "10px";
+    resultBox.style.display = "none";
+    document.body.appendChild(resultBox);
+
+    for(let i=1;i<=20;i++){
+        let box = document.createElement("div");
+        box.className="miniBox"; box.innerText=i;
+        box.addEventListener("click",()=>checkGuess(i, box));
+        grid.appendChild(box);
+    }
+
+    function checkGuess(i, box){
+        attempts++;
+        if(i===number){
+            const points=[150,130,100,90,80,75,70,60,50,30,20,0,0,0,0,0,0,0,0,0];
+            let point = points[attempts-1] || 0;
+            skor+=point; skorY.innerText=skor;
+
+            // Mesaj göster
+            resultBox.innerText = `Tebrikler! +${point} puan kazandınız`;
+            resultBox.style.display = "block";
+
+            setTimeout(()=>{
+                resultBox.style.display = "none";
+                mg.style.display="none";
+                balls.forEach(b=>b.style.display="flex");
+                startGameTimer();
+            }, 3000); // 3 saniye bekle
+        } else {
+            box.style.background="red";
+            setTimeout(()=>box.style.background="#fff",500);
+        }
+    }
+}
+
+// LİDERLİK TABLOSU
+function saveScore(name, score) {
+    let scores = JSON.parse(localStorage.getItem("highscores") || "[]");
+    scores.push({name:name, score:score});
+    scores.sort((a,b)=>b.score - a.score);
+    if(scores.length>10) scores = scores.slice(0,10);
+    localStorage.setItem("highscores", JSON.stringify(scores));
+}
+function showLeaderboard() {
+    const lb = document.getElementById("leaderboard");
+    const list = document.getElementById("leaderboardList");
+    lb.style.display="block"; list.innerHTML="";
+    let scores = JSON.parse(localStorage.getItem("highscores") || "[]");
+    scores.forEach(s=>{
+        let li = document.createElement("li");
+        li.innerText = `${s.name}: ${s.score}`;
+        list.appendChild(li);
+    })
+}
+function closeLeaderboard(){document.getElementById("leaderboard").style.display="none";}
+document.getElementById("leaderboardBtn").onclick = showLeaderboard;
+
+// Oyun bittiğinde skor ekle
+function gameOver() {
+    pauseGameTimer();
+    let name = prompt("Oyun bitti! İsminizi girin:");
+    if(name) saveScore(name, skor);
+    resetGame();
+}
+
+// Oyunu resetleyen fonksiyon
+function resetGame(){
+    skor=20; sure=60; slipperUse=2; rocketUse=2; bUsed=false; minigameUse=10;
+    skorY.innerText=skor; sureY.innerText=sure;
+    slipperY.innerText=slipperUse; rocketY.innerText=rocketUse; minigameY.innerText=minigameUse;
+    balls.forEach(b=>b.style.display="flex");
+    document.getElementById("menu").style.display="flex";
+}
+</script>
+</body>
+</html>
